@@ -1,0 +1,75 @@
+/** @jsxImportSource @opentui/solid */
+import type { MouseEvent } from "@opentui/core"
+import { useTerminalDimensions } from "@opentui/solid"
+import { createResource, createSignal, Match, onCleanup, Show, Switch } from "solid-js"
+import { useTheme } from "./theme"
+
+export function isDiffImageFile(file: string) {
+  return /\.(png|jpe?g|webp|gif)$/i.test(file)
+}
+
+export function DiffViewerImage(props: {
+  file: string
+  load: (file: string, signal: AbortSignal) => Promise<Uint8Array>
+  label?: string
+  onEnlarge?: (bytes: Uint8Array) => void
+}) {
+  const theme = useTheme()
+  const dimensions = useTerminalDimensions()
+  const height = () => Math.max(3, Math.min(8, Math.floor(dimensions().height / 4)))
+  const [image] = createResource(
+    () => {
+      const controller = new AbortController()
+      onCleanup(() => controller.abort())
+      return { file: props.file, signal: controller.signal }
+    },
+    (input) => props.load(input.file, input.signal),
+  )
+
+  return (
+    <box width="100%" flexShrink={0} gap={1} paddingLeft={1} paddingRight={1} paddingBottom={1}>
+      <text fg={theme.text.muted}>{props.label ?? "Working tree preview"}</text>
+      <box height={height() + 2} flexShrink={0} gap={1}>
+        <Switch>
+          <Match when={image.error}>
+            <text fg={theme.text.feedback.error.base}>Could not load image</text>
+          </Match>
+          <Match when={image.loading}>
+            <text fg={theme.text.muted}>Loading image…</text>
+          </Match>
+          <Match when={!image.error && image()} keyed>
+            {(bytes) => {
+              const [failed, setFailed] = createSignal(false)
+              const [size, setSize] = createSignal<string>()
+              const open = (event: MouseEvent) => {
+                if (event.button !== 0 || !size() || failed()) return
+                event.stopPropagation()
+                props.onEnlarge?.(bytes)
+              }
+              return (
+                <Show when={!failed()} fallback={<text fg={theme.text.feedback.error.base}>Could not decode image</text>}>
+                  <box width="100%" height={height()} onMouseUp={open}>
+                    <image id={`diff-image-${props.file}`} source={bytes} fit="fit" protocol="auto"
+                      width="100%" height="100%"
+                      onLoad={(loaded) => setSize(`${loaded.width} x ${loaded.height}`)}
+                      onError={() => setFailed(true)} />
+                  </box>
+                  <Show when={size()}>
+                    {(value) => (
+                      <box flexDirection="row" justifyContent="space-between">
+                        <text fg={theme.text.muted}>{value()}</text>
+                        <Show when={props.onEnlarge}>
+                          <text fg={theme.text.action.secondary.base} onMouseUp={open}>Click to enlarge</text>
+                        </Show>
+                      </box>
+                    )}
+                  </Show>
+                </Show>
+              )
+            }}
+          </Match>
+        </Switch>
+      </box>
+    </box>
+  )
+}

@@ -1,0 +1,8 @@
+diffview includes source code and theme assets adapted from OpenCode.
+
+Upstream: https://github.com/anomalyco/opencode
+Source revision: d432a06
+Upstream license: MIT
+Upstream copyright: Copyright (c) 2025 opencode
+
+See docs/development/upstream.md for the extracted modules and local changes.

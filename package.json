@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "diffview",
+  "version": "0.1.0",
+  "description": "A standalone terminal diff viewer based on OpenCode's TUI Diff Viewer",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "diffview": "./bin/diffview.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun run script/build.ts",
+    "pack": "bun run script/pack.ts",
+    "test": "bun test --timeout 30000",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@opencode/theme": "2.3.0",
+    "@opentui/core": "0.8.4",
+    "@opentui/solid": "0.8.4",
+    "diff": "8.0.4",
+    "solid-js": "1.9.17"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "1.0.9",
+    "@types/bun": "1.4.3",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "bun@1.4.2"
+}

@@ -1,0 +1,38 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile --os="*" --cpu="*" --libc="*"
+      - run: bun run check
+      - run: bun run build
+      - run: bun run build -- --compile
+      - run: ./dist/diffview --help
+        if: runner.os != 'Windows'
+      - run: ./dist/diffview.exe --help
+        if: runner.os == 'Windows'
+        shell: bash
+      - run: bun run pack
+      - name: npm wrapper smoke
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          platform=$(node -p "process.platform === 'win32' ? 'windows' : process.platform")
+          arch=$(node -p "process.arch")
+          mkdir -p .cache/npm-smoke
+          cd .cache/npm-smoke
+          npm install --no-audit --no-fund "../../dist/npm/diffview-${version}.tgz" "../../dist/npm/diffview-${platform}-${arch}-${version}.tgz"
+          ./node_modules/.bin/diffview --version

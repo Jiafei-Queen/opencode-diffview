@@ -1,0 +1,19 @@
+export const MODIFIED_PATCH = `diff --git a/src/hello.ts b/src/hello.ts
+index 257cc56..5716ca5 100644
+--- a/src/hello.ts
++++ b/src/hello.ts
+@@ -1 +1,2 @@
+-const oldValue = true
++const newValue = true
++console.log(newValue)
+`
+
+export const ADDED_PATCH = `diff --git a/new.txt b/new.txt
+new file mode 100644
+index 0000000..3e75765
+--- /dev/null
++++ b/new.txt
+@@ -0,0 +1,2 @@
++one
++two
+`
