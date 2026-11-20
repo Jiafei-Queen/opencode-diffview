@@ -34,5 +34,6 @@ jobs:
           arch=$(node -p "process.arch")
           mkdir -p .cache/npm-smoke
           cd .cache/npm-smoke
+          npm init -y >/dev/null
           npm install --no-audit --no-fund "../../dist/npm/opencode-diffview-${version}.tgz" "../../dist/npm/opencode-diffview-${platform}-${arch}-${version}.tgz"
           ./node_modules/.bin/ocdiff --version
