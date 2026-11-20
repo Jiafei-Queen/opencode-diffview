@@ -14,14 +14,14 @@ async function main() {
     return
   }
   if (args.type === "version") {
-    console.log("diffview 0.1.0")
+    console.log("ocdiff 0.1.0")
     return
   }
   if (args.type === "themes") {
     for (const name of themeNames()) console.log(`${name}\t${themeLabel(name)}`)
     return
   }
-  if (!process.stdout.isTTY) throw new Error("diffview requires an interactive terminal on stdout.")
+  if (!process.stdout.isTTY) throw new Error("ocdiff requires an interactive terminal on stdout.")
 
   const cwd = path.resolve(args.cwd)
   const patch = args.patch === "-" ? await Bun.stdin.text()
@@ -45,6 +45,6 @@ async function openTerminalInput() {
 }
 
 main().catch((error) => {
-  console.error(`diffview: ${error instanceof Error ? error.message : String(error)}`)
+  console.error(`ocdiff: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
 })

@@ -1,8 +1,17 @@
-# diffview
+# opencode-diffview
+
+> **Unofficial project.** This is a community project, not an official OpenCode
+> product. It is not affiliated with, endorsed by, or maintained by OpenCode or
+> its authors. The "OpenCode" name is used only to describe the origin of the
+> adapted Diff Viewer code and theme assets. See [NOTICE](NOTICE) for upstream
+> attribution.
 
 A standalone terminal Diff Viewer extracted from OpenCode's TUI. It renders local
 Git comparisons and unified patches with OpenTUI, Solid, and Tree-sitter syntax
 highlighting. It does not start or require an OpenCode server.
+
+The command is `ocdiff`; the project is named after the OpenCode Diff Viewer it
+was extracted from.
 
 ## Features
 
@@ -24,32 +33,32 @@ runtime for repository comparisons, not for patch-file input.
 ```sh
 bun install
 bun run build -- --compile
-./dist/diffview --help
+./dist/ocdiff --help
 ```
 
 ## Usage
 
 ```sh
 # Branch commits and local changes relative to the detected base
-diffview
+ocdiff
 
 # Select the comparison explicitly
-diffview --base main --source committed
+ocdiff --base main --source committed
 
 # Staged, unstaged, and untracked changes relative to HEAD
-diffview --source working
+ocdiff --source working
 
 # Read a patch file
-diffview --patch changes.diff
+ocdiff --patch changes.diff
 
 # Pipe a patch; keyboard input is reconnecting to the controlling terminal
-git diff HEAD | diffview -
+git diff HEAD | ocdiff -
 
 # Start with a bundled theme and color mode
-diffview --theme tokyonight --mode light
+ocdiff --theme tokyonight --mode light
 
 # Discover theme names
-diffview --list-themes
+ocdiff --list-themes
 ```
 
 Display options include `--theme <name>` (default `opencode2`),
@@ -87,8 +96,9 @@ bun run build -- --compile --target linux-x64   # optional cross targets
 bun run pack                          # dist/npm/*.tgz
 ```
 
-`pack` produces one package per compiled platform plus a `diffview` wrapper
-whose optional dependencies select the right binary at install time.
+`pack` produces one package per compiled platform plus an `opencode-diffview`
+wrapper whose optional dependencies select the right binary at install time and
+expose the `ocdiff` command.
 
 ## Development
 

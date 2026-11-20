@@ -1,12 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "diffview",
+  "name": "opencode-diffview",
   "version": "0.1.0",
-  "description": "A standalone terminal diff viewer based on OpenCode's TUI Diff Viewer",
+  "description": "A standalone terminal diff viewer extracted from OpenCode's TUI Diff Viewer",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "diffview": "./bin/diffview.js"
+    "ocdiff": "./bin/ocdiff.js"
   },
   "files": [
     "bin",

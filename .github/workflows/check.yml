@@ -20,9 +20,9 @@ jobs:
       - run: bun run check
       - run: bun run build
       - run: bun run build -- --compile
-      - run: ./dist/diffview --help
+      - run: ./dist/ocdiff --help
         if: runner.os != 'Windows'
-      - run: ./dist/diffview.exe --help
+      - run: ./dist/ocdiff.exe --help
         if: runner.os == 'Windows'
         shell: bash
       - run: bun run pack
@@ -34,5 +34,5 @@ jobs:
           arch=$(node -p "process.arch")
           mkdir -p .cache/npm-smoke
           cd .cache/npm-smoke
-          npm install --no-audit --no-fund "../../dist/npm/diffview-${version}.tgz" "../../dist/npm/diffview-${platform}-${arch}-${version}.tgz"
-          ./node_modules/.bin/diffview --version
+          npm install --no-audit --no-fund "../../dist/npm/opencode-diffview-${version}.tgz" "../../dist/npm/opencode-diffview-${platform}-${arch}-${version}.tgz"
+          ./node_modules/.bin/ocdiff --version

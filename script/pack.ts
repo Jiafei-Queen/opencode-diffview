@@ -26,7 +26,7 @@ const TARGETS = [
 const host = `${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`
 const available: { name: string; os: string; cpu: string; libc?: string; binary: string }[] = []
 for (const target of TARGETS) {
-  const executable = target.os === "win32" ? "diffview.exe" : "diffview"
+  const executable = target.os === "win32" ? "ocdiff.exe" : "ocdiff"
   // The host build lands directly in dist/; cross builds land in dist/<target>/.
   const candidate = target.name === host
     ? path.join(dist, executable)
@@ -68,7 +68,7 @@ for (const target of available) {
 
 const wrapperDir = path.join(packRoot, pkg.name)
 await mkdir(path.join(wrapperDir, "bin"), { recursive: true })
-await Bun.write(path.join(wrapperDir, "bin", "diffview.cjs"), launcher())
+await Bun.write(path.join(wrapperDir, "bin", "ocdiff.cjs"), launcher())
 await Bun.write(path.join(wrapperDir, "LICENSE"), Bun.file(path.join(dir, "LICENSE")))
 await Bun.write(path.join(wrapperDir, "NOTICE"), Bun.file(path.join(dir, "NOTICE")))
 await Bun.write(
@@ -79,7 +79,7 @@ await Bun.write(
       version: pkg.version,
       description: pkg.description,
       license: pkg.license,
-      bin: { diffview: "./bin/diffview.cjs" },
+      bin: { ocdiff: "./bin/ocdiff.cjs" },
       files: ["bin", "LICENSE", "NOTICE"],
       os: ["darwin", "linux", "win32"],
       cpu: ["arm64", "x64"],
@@ -105,7 +105,7 @@ const path = require("node:path")
 const platform = process.platform === "win32" ? "windows" : process.platform
 const base = \`${pkg.name}-\${platform}-\${process.arch}\`
 const candidates = process.platform === "linux" && isMusl() ? [\`\${base}-musl\`, base] : [base]
-const executable = process.platform === "win32" ? "diffview.exe" : "diffview"
+const executable = process.platform === "win32" ? "ocdiff.exe" : "ocdiff"
 
 for (const name of candidates) {
   let binary
@@ -116,13 +116,13 @@ for (const name of candidates) {
   }
   const result = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" })
   if (result.error) {
-    console.error(\`diffview: \${result.error.message}\`)
+    console.error(\`ocdiff: \${result.error.message}\`)
     process.exit(1)
   }
   process.exit(result.status ?? 1)
 }
 console.error(
-  \`diffview: no binary for \${platform}-\${process.arch}. Reinstall with optional dependencies enabled.\`,
+  \`ocdiff: no binary for \${platform}-\${process.arch}. Reinstall with optional dependencies enabled.\`,
 )
 process.exit(1)
 

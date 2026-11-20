@@ -20,7 +20,7 @@ if (requestedTarget && !compile) throw new Error("--target requires --compile.")
 const outdir = path.resolve(import.meta.dir, "../dist")
 const target = requestedTarget ?? `${process.platform}-${process.arch}`
 const windows = requestedTarget?.startsWith("windows") ?? process.platform === "win32"
-const executable = windows ? "diffview.exe" : "diffview"
+const executable = windows ? "ocdiff.exe" : "ocdiff"
 const output = requestedTarget ? path.join(outdir, requestedTarget) : outdir
 const result = await Bun.build({
   entrypoints: [path.resolve(import.meta.dir, "../src/index.ts")],

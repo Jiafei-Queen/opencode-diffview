@@ -8,11 +8,11 @@ import { run } from "../src/provider/process"
 let directory: string
 
 beforeEach(async () => {
-  directory = await mkdtemp(path.join(os.tmpdir(), "diffview-git-test-"))
+  directory = await mkdtemp(path.join(os.tmpdir(), "opencode-diffview-git-test-"))
   const git = (...args: string[]) => run(["git", ...args], { cwd: directory })
   await git("init", "-b", "main")
-  await git("config", "user.email", "diffview@example.com")
-  await git("config", "user.name", "Diffview Test")
+  await git("config", "user.email", "opencode-diffview@example.com")
+  await git("config", "user.name", "ocdiff Test")
   await Bun.write(path.join(directory, "tracked.txt"), "base\n")
   await git("add", "tracked.txt")
   await git("commit", "-m", "base")

@@ -91,13 +91,13 @@ function parseChoice<const T extends string>(flag: string, value: string, choice
   throw new Error(`${flag} must be one of: ${choices.join(", ")}.`)
 }
 
-export const HELP = `diffview 0.1.0
-A standalone terminal diff viewer
+export const HELP = `ocdiff 0.1.0
+A standalone terminal diff viewer extracted from OpenCode's TUI
 
 Usage:
-  diffview [options]
-  diffview --patch <file>
-  git diff HEAD | diffview -
+  ocdiff [options]
+  ocdiff --patch <file>
+  git diff HEAD | ocdiff -
 
 Git options:
   --cwd <directory>          Repository directory (default: cwd)

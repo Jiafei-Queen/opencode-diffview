@@ -8,7 +8,7 @@ bun run build
 ```
 
 The OpenTUI platform packages must be installed before bundling. The output is
-`dist/index.js`; `bin/diffview.js` runs it with Bun.
+`dist/index.js`; `bin/ocdiff.js` runs it with Bun.
 
 ## Standalone executable
 
@@ -36,7 +36,7 @@ smoke test. Help alone does not validate native OpenTUI and Tree-sitter assets.
 On macOS, a local pseudo-TTY smoke test is:
 
 ```sh
-(sleep 2; printf 'q') | script -q /dev/null ./dist/diffview --patch test/fixture.diff
+(sleep 2; printf 'q') | script -q /dev/null ./dist/ocdiff --patch test/fixture.diff
 ```
 
 ## npm distribution
@@ -48,16 +48,16 @@ bun run pack
 `script/pack.ts` collects every compiled binary in `dist/` (host build in
 `dist/`, cross builds in `dist/<target>/`) and produces tarballs in `dist/npm`:
 
-- `diffview-<target>`: one package per platform, restricted by `os`/`cpu`/`libc`
-- `diffview`: a wrapper whose `optionalDependencies` pull in the matching
-  platform package; its Node launcher execs the binary with inherited stdio
+- `opencode-diffview-<target>`: one package per platform, restricted by `os`/`cpu`/`libc`
+- `opencode-diffview`: a wrapper whose `optionalDependencies` pull in the matching
+  platform package; its Node launcher execs the `ocdiff` binary with inherited stdio
 
 Verify the install chain locally without publishing:
 
 ```sh
 tmp=$(mktemp -d) && cd "$tmp"
-npm install /path/to/dist/npm/diffview-0.1.0.tgz /path/to/dist/npm/diffview-darwin-arm64-0.1.0.tgz
-./node_modules/.bin/diffview --version
+npm install /path/to/dist/npm/opencode-diffview-0.1.0.tgz /path/to/dist/npm/opencode-diffview-darwin-arm64-0.1.0.tgz
+./node_modules/.bin/ocdiff --version
 ```
 
 Publish platform packages before the wrapper. Signing, notarization,
