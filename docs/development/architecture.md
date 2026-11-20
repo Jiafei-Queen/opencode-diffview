@@ -37,9 +37,25 @@ virtualization. Files over 3000 added lines are split into 128-line chunks;
 only the visible chunks and one chunk on either side are mounted. Highlighting
 runs against the whole file before highlights are sliced into chunks.
 
-The theme comes from `@opencode/theme/tui` and the included OpenCode theme
-asset. It supplies semantic diff colors and an OpenTUI `SyntaxStyle` without
-introducing server dependencies.
+## Themes
+
+`src/ui/themes/index.ts` registers all 34 bundled OpenCode palettes: the two v2
+documents and 32 v1 presets. V1 sources are migrated with `migrateV1`; v2
+sources are parsed with `parseThemeDocument`. Documents and resolved palettes
+are cached lazily per `name` and mode. Themes that only provide one mode fall
+back to it, and the footer shows the effective mode.
+
+`ThemeProvider` keeps the active name and mode in signals. It exposes the
+resolved palette through `createComponentTheme`, whose getters read the active
+selection, so components can keep `const theme = useTheme()` and still repaint
+when the theme changes. `useSyntax()` returns an accessor because replacing the
+palette regenerates the OpenTUI `SyntaxStyle`; the previous style is destroyed
+after the renderer goes idle.
+
+`t` and `T` cycle palettes in `THEME_ORDER`, preserving the requested mode.
+Switching does not remount the viewer, so reviewed state, scroll position, and
+layout survive. The footer always shows the active theme; `--theme` and
+`--mode` select the initial values, and `--list-themes` prints the names.
 
 Image files in working comparisons render a working-tree thumbnail through the
 provider's `loadImage`; clicking it opens a local enlarge dialog. Committed
@@ -62,6 +78,9 @@ input may use a non-TTY stdin, but the process must be able to open `/dev/tty`
 - `test/viewer.test.tsx`: real OpenTUI frames, layouts, review, errors, and
   large-file mount counts
 - `test/viewer-source.test.tsx`: source/base keyboard workflows
+- `test/themes.test.ts`: theme resolution, mode fallback, labels, and cycling
+- `test/theme-switch.test.tsx`: real frames, syntax replacement, footer labels,
+  reviewed-state retention, and base-search input isolation
 - `test/image.test.tsx`, `test/viewer-image.test.tsx`: image decode, abort,
   error recovery, and the committed-image constraint
 

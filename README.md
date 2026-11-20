@@ -13,7 +13,8 @@ highlighting. It does not start or require an OpenCode server.
 - Unified diff files and stdin input
 - Working-tree image previews with click-to-enlarge
 - Large added-file virtualization
-- Dark and light themes
+- All 34 bundled OpenCode color themes with runtime `t` / `T` switching
+- Dark and light modes
 
 ## Install from source
 
@@ -43,10 +44,16 @@ diffview --patch changes.diff
 
 # Pipe a patch; keyboard input is reconnecting to the controlling terminal
 git diff HEAD | diffview -
+
+# Start with a bundled theme and color mode
+diffview --theme tokyonight --mode light
+
+# Discover theme names
+diffview --list-themes
 ```
 
-Display options include `--view auto|split|unified`, `--no-tree`, `--single`, and
-`--theme dark|light`.
+Display options include `--theme <name>` (default `opencode2`),
+`--mode dark|light`, `--view auto|split|unified`, `--no-tree`, and `--single`.
 
 ## Keys
 
@@ -62,14 +69,15 @@ Display options include `--view auto|split|unified`, `--no-tree`, `--single`, an
 | `s` | Toggle single-file mode |
 | `v` | Toggle split/unified view |
 | `d` | Choose source or base |
+| `t` / `T` | Next/previous color theme |
 | `m` | Mark file reviewed |
 | `?` | Help |
 | `q`, `Esc`, `Ctrl+C` | Close |
 
-Reviewed state and source/base selections last only for the current process.
-Image previews show the working tree only; committed and deleted images are
-never substituted with working-tree content. OpenCode session-based “Last turn”
-diffs are outside this tool's scope.
+Reviewed state, source/base, and the active theme last only for the current
+process. Image previews show the working tree only; committed and deleted images
+are never substituted with working-tree content. OpenCode session-based “Last
+turn” diffs are outside this tool's scope.
 
 ## npm packages
 

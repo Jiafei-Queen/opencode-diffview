@@ -9,7 +9,8 @@ import { DiffViewer, type ViewerPreferences } from "./viewer"
 export async function runViewer(options: {
   provider: DiffProvider
   preferences: ViewerPreferences
-  theme: ThemeMode
+  theme: string
+  mode: ThemeMode
   stdin?: ReadStream
 }) {
   const renderer = await createCliRenderer({
@@ -24,7 +25,7 @@ export async function runViewer(options: {
   })
   try {
     await render(() => (
-      <ThemeProvider mode={options.theme}>
+      <ThemeProvider mode={options.mode} theme={options.theme}>
         <DiffViewer provider={options.provider} preferences={options.preferences}
           onClose={() => renderer.destroy()} />
       </ThemeProvider>

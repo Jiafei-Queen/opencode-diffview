@@ -19,7 +19,9 @@ It does not use the browser-side Pierre renderer or require an OpenCode server.
   viewer dialog)
 - `packages/tui/test/fixture/diff-image.ts` → `test/diff-image.ts`
 - `packages/tui/src/theme/color.ts` → `src/ui/color.ts`
-- `packages/tui/src/theme/assets/v2/opencode2.json` → `src/ui/opencode2.json`
+- `packages/tui/src/theme/component.ts` → `src/ui/theme-component.ts`
+- `packages/tui/src/theme/v1.ts` (theme list) → `src/ui/themes/index.ts`
+- `packages/tui/src/theme/assets/**/*.json` → `src/ui/themes/assets/**/*.json`
 
 The plugin, route, panel, session and OpenCode client layers are intentionally
 replaced by a standalone CLI and local diff providers. The viewer context is

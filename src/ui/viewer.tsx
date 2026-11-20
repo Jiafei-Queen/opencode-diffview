@@ -38,7 +38,7 @@ import { DiffViewerFileTree } from "./file-tree-view"
 import { FilePath } from "./file-path"
 import { DiffViewerImage, isDiffImageFile } from "./image"
 import { PatchDiff, type PatchDiffRef } from "./patch-diff"
-import { useSyntax, useTheme } from "./theme"
+import { useSyntax, useTheme, useThemeControls } from "./theme"
 
 const MIN_SPLIT_WIDTH = 100
 const COMPACT_MAX_WIDTH = 87
@@ -64,6 +64,7 @@ export function DiffViewer(props: {
 }) {
   const theme = useTheme()
   const syntax = useSyntax()
+  const themeControls = useThemeControls()
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [mode, setMode] = createSignal<DiffMode>(props.provider.initialMode)
@@ -269,6 +270,11 @@ export function DiffViewer(props: {
       if (currentDialog.type === "base") return
       if (currentDialog.type === "source" || currentDialog.type === "menu") return
     }
+    if (event.name === "t" && !event.ctrl && !event.meta && !event.option) {
+      event.preventDefault()
+      themeControls.cycleTheme(event.shift ? -1 : 1)
+      return
+    }
     if (event.name === "escape" || event.name === "q" || (event.name === "c" && event.ctrl)) {
       event.preventDefault()
       props.onClose()
@@ -381,12 +387,21 @@ export function DiffViewer(props: {
     }
   })
 
-  const help = <text id="diff-help-shortcut" fg={theme.text.muted} selectable={false} wrapMode="none"
-    onMouseUp={(event) => {
-      if (event.button !== MouseButton.LEFT) return
-      event.stopPropagation()
-      openDialog({ type: "help" })
-    }}>? help</text>
+  function Help() {
+    return <text id="diff-help-shortcut" fg={theme.text.muted} selectable={false} wrapMode="none"
+      onMouseUp={(event) => {
+        if (event.button !== MouseButton.LEFT) return
+        event.stopPropagation()
+        openDialog({ type: "help" })
+      }}>? help</text>
+  }
+
+  const footer = (
+    <box flexDirection="row" gap={1} width="100%">
+      <text fg={theme.text.muted} wrapMode="none" truncate flexGrow={1}>{themeControls.label()}</text>
+      <Help />
+    </box>
+  )
 
   return (
     <box width="100%" height="100%" backgroundColor={theme.background.base}>
@@ -415,7 +430,7 @@ export function DiffViewer(props: {
                   expandedNodes={expandedNodes()} onRowClick={clickRow} onFileContextMenu={openFileMenu}
                   source={SOURCE_LABELS[mode()].label} sourceDetail={detail()}
                   onSwitchSource={props.provider.modes.length > 1 ? () => openDialog({ type: "source" }) : undefined}
-                  footer={help} />
+                  footer={footer} />
               </Show>
               <box flexGrow={1} minWidth={0} minHeight={0}>
                 <box height={1} flexShrink={0} marginLeft={inset()} marginRight={inset()}
@@ -469,7 +484,7 @@ export function DiffViewer(props: {
                                   onCleanup(() => patchDiffs.delete(entry.fileIndex))
                                 }} diff={patch()} scroll={() => scroll} hunkFg={theme.diff.text.hunkHeader}
                                   view={entry.file.status === "modified" ? view() : "unified"}
-                                  filetype={filetype(entry.file.file)} syntaxStyle={syntax} showLineNumbers
+                                  filetype={filetype(entry.file.file)} syntaxStyle={syntax()} showLineNumbers
                                   gutterPadding={compact() ? 1 : 0} width="100%" wrapMode="char" fg={theme.text.base}
                                   addedBg={theme.diff.background.added} removedBg={theme.diff.background.removed}
                                   contextBg={theme.diff.background.context} addedSignColor={theme.diff.highlight.added}
@@ -491,8 +506,11 @@ export function DiffViewer(props: {
         </Switch>
       </box>
       <Show when={compact() || !showTree()}>
-        <box height={1} flexShrink={0} flexDirection="row" paddingLeft={2} paddingRight={1}>
-          <text fg={theme.text.muted} flexGrow={1}>q close</text>{help}
+        <box height={1} flexShrink={0} flexDirection="row" gap={1} paddingLeft={2} paddingRight={1}>
+          <text fg={theme.text.muted} flexGrow={1} wrapMode="none" truncate>
+            {`q close · ${themeControls.label()}`}
+          </text>
+          <Help />
         </box>
       </Show>
       <Show when={dialog()}>{(state) => <>
@@ -527,7 +545,7 @@ export function DiffViewer(props: {
               ["j/k, ↓/↑", "Scroll"], ["PgUp/PgDn, ctrl+b/f", "Page"], ["ctrl+u/d", "Half page"],
               ["gg/G, Home/End", "Start/end"], ["[/]", "Previous/next hunk"], ["n/p", "Previous/next file"],
               ["b", "Toggle file tree"], ["s", "Single file"], ["v", "Split/unified"], ["d", "Diff source"],
-              ["m", "Mark reviewed"], ["q/Esc", "Close"],
+              ["m", "Mark reviewed"], ["t / T", "Next/previous theme"], ["q/Esc", "Close"],
             ]}>{([key, label]) => <box flexDirection="row"><text width={24} fg={theme.text.base}>{key}</text>
               <text fg={theme.text.muted}>{label}</text></box>}</For>
           </DialogFrame>

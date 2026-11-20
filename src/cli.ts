@@ -1,17 +1,19 @@
 import type { DiffSource } from "./model"
-import type { ThemeMode } from "./ui/theme"
+import { DEFAULT_THEME, hasTheme, type ThemeMode } from "./ui/themes"
 import type { ViewerPreferences } from "./ui/viewer"
 
 export type CliArguments =
   | { type: "help" }
   | { type: "version" }
+  | { type: "themes" }
   | {
       type: "run"
       cwd: string
       source: DiffSource
       base?: string
       patch?: string
-      theme: ThemeMode
+      theme: string
+      mode: ThemeMode
       preferences: ViewerPreferences
     }
 
@@ -20,12 +22,14 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   let source: DiffSource = "branch"
   let base: string | undefined
   let patch: string | undefined
-  let theme: ThemeMode = "dark"
+  let theme = DEFAULT_THEME
+  let mode: ThemeMode = "dark"
   let view: ViewerPreferences["view"] = "auto"
   let tree = true
   let single = false
   let help = false
   let version = false
+  let themes = false
 
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index]!
@@ -40,6 +44,10 @@ export function parseArguments(argv: readonly string[]): CliArguments {
     }
     if (argument === "--version") {
       version = true
+      continue
+    }
+    if (argument === "--list-themes") {
+      themes = true
       continue
     }
     if (argument === "--no-tree") {
@@ -61,16 +69,21 @@ export function parseArguments(argv: readonly string[]): CliArguments {
     else if (flag === "--source") source = parseChoice(flag, value(), ["branch", "committed", "working"])
     else if (flag === "--base") base = value()
     else if (flag === "--patch") patch = value()
-    else if (flag === "--theme") theme = parseChoice(flag, value(), ["dark", "light"])
+    else if (flag === "--theme") {
+      const name = value()
+      if (!hasTheme(name)) throw new Error(`Unknown theme: ${name}. Use --list-themes.`)
+      theme = name
+    } else if (flag === "--mode") mode = parseChoice(flag, value(), ["dark", "light"])
     else if (flag === "--view") view = parseChoice(flag, value(), ["auto", "split", "unified"])
     else throw new Error(`Unknown argument: ${argument}`)
   }
 
   if (help) return { type: "help" }
   if (version) return { type: "version" }
+  if (themes) return { type: "themes" }
   if (patch && base) throw new Error("--base cannot be used with patch input.")
   if (patch && source !== "branch") throw new Error("--source cannot be used with patch input.")
-  return { type: "run", cwd, source, base, patch, theme, preferences: { view, tree, single } }
+  return { type: "run", cwd, source, base, patch, theme, mode, preferences: { view, tree, single } }
 }
 
 function parseChoice<const T extends string>(flag: string, value: string, choices: readonly T[]): T {
@@ -96,10 +109,12 @@ Input:
   -                          Read a unified diff from stdin
 
 Display:
+  --theme <name>             Color theme (default: opencode2)
+  --mode <mode>              dark or light (default: dark)
+  --list-themes              List available color themes
   --view <mode>              auto, split, or unified (default: auto)
   --no-tree                  Hide the file tree
   --single                   Show one file at a time
-  --theme <mode>             dark or light (default: dark)
 
 Other:
   -h, --help                 Show this help
@@ -107,5 +122,5 @@ Other:
 
 Keys:
   j/k scroll  [/] hunks  n/p files  b tree  s single  v view
-  d source  m reviewed  ? help  q/Esc close
+  d source  t/T theme  m reviewed  ? help  q/Esc close
 `
