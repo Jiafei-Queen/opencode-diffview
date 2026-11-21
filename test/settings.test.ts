@@ -89,5 +89,5 @@ test("resolves the config path from XDG and the app override", () => {
   expect(settingsFile({}, "/home/user"))
     .toBe(path.join("/home/user", ".config", "ocdiff", "config.json"))
   expect(settingsFile({ OCDIFF_CONFIG_HOME: "/custom" }, "/home/user"))
-    .toBe(path.join("/custom", "config.json"))
+    .toBe(path.join(path.resolve("/custom"), "config.json"))
 })
