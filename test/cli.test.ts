@@ -17,6 +17,17 @@ test("selects a color theme and mode", () => {
   expect(() => parseArguments(["--mode", "dim"])).toThrow("--mode")
 })
 
+test("parses scroll speed options", () => {
+  expect(parseArguments(["--scroll-lines", "3", "--scroll-wheel", "1.5"])).toMatchObject({
+    type: "run", preferences: { scrollLines: 3, scrollWheel: 1.5 },
+  })
+  expect(parseArguments([])).toMatchObject({ type: "run", preferences: { view: "auto", tree: true, single: false } })
+  expect(() => parseArguments(["--scroll-lines", "0"])).toThrow("--scroll-lines")
+  expect(() => parseArguments(["--scroll-lines", "2.5"])).toThrow("--scroll-lines")
+  expect(() => parseArguments(["--scroll-wheel", "6"])).toThrow("--scroll-wheel")
+  expect(() => parseArguments(["--scroll-wheel", "fast"])).toThrow("--scroll-wheel")
+})
+
 test("accepts stdin and patch files", () => {
   expect(parseArguments(["-"])).toMatchObject({ type: "run", patch: "-" })
   expect(parseArguments(["--patch", "a.diff"])).toMatchObject({ type: "run", patch: "a.diff" })

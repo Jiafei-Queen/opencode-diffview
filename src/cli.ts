@@ -1,4 +1,10 @@
 import type { DiffSource } from "./model"
+import {
+  SCROLL_LINES_MAX,
+  SCROLL_LINES_MIN,
+  SCROLL_WHEEL_MAX,
+  SCROLL_WHEEL_MIN,
+} from "./ui/scroll"
 import { DEFAULT_THEME, hasTheme, type ThemeMode } from "./ui/themes"
 import type { ViewerPreferences } from "./ui/viewer"
 
@@ -27,6 +33,8 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   let view: ViewerPreferences["view"] = "auto"
   let tree = true
   let single = false
+  let scrollLines: number | undefined
+  let scrollWheel: number | undefined
   let help = false
   let version = false
   let themes = false
@@ -75,6 +83,8 @@ export function parseArguments(argv: readonly string[]): CliArguments {
       theme = name
     } else if (flag === "--mode") mode = parseChoice(flag, value(), ["dark", "light"])
     else if (flag === "--view") view = parseChoice(flag, value(), ["auto", "split", "unified"])
+    else if (flag === "--scroll-lines") scrollLines = parseNumber(flag, value(), SCROLL_LINES_MIN, SCROLL_LINES_MAX, true)
+    else if (flag === "--scroll-wheel") scrollWheel = parseNumber(flag, value(), SCROLL_WHEEL_MIN, SCROLL_WHEEL_MAX)
     else throw new Error(`Unknown argument: ${argument}`)
   }
 
@@ -83,12 +93,36 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   if (themes) return { type: "themes" }
   if (patch && base) throw new Error("--base cannot be used with patch input.")
   if (patch && source !== "branch") throw new Error("--source cannot be used with patch input.")
-  return { type: "run", cwd, source, base, patch, theme, mode, preferences: { view, tree, single } }
+  return {
+    type: "run",
+    cwd,
+    source,
+    base,
+    patch,
+    theme,
+    mode,
+    preferences: {
+      view,
+      tree,
+      single,
+      ...(scrollLines === undefined ? {} : { scrollLines }),
+      ...(scrollWheel === undefined ? {} : { scrollWheel }),
+    },
+  }
 }
 
 function parseChoice<const T extends string>(flag: string, value: string, choices: readonly T[]): T {
   if (choices.includes(value as T)) return value as T
   throw new Error(`${flag} must be one of: ${choices.join(", ")}.`)
+}
+
+function parseNumber(flag: string, value: string, min: number, max: number, integer = false) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || (integer && !Number.isInteger(parsed))) {
+    throw new Error(`${flag} requires ${integer ? "an integer" : "a number"}.`)
+  }
+  if (parsed < min || parsed > max) throw new Error(`${flag} must be between ${min} and ${max}.`)
+  return parsed
 }
 
 export const HELP = `ocdiff 0.1.0
@@ -113,6 +147,8 @@ Display:
   --mode <mode>              dark or light (default: dark)
   --list-themes              List available color themes
   --view <mode>              auto, split, or unified (default: auto)
+  --scroll-lines <n>         Lines per j/k or arrow key (1-20, default: 1)
+  --scroll-wheel <n>         Mouse wheel speed multiplier (0.25-5, default: 1)
   --no-tree                  Hide the file tree
   --single                   Show one file at a time
 

@@ -38,6 +38,7 @@ import { DiffViewerFileTree } from "./file-tree-view"
 import { FilePath } from "./file-path"
 import { DiffViewerImage, isDiffImageFile } from "./image"
 import { PatchDiff, type PatchDiffRef } from "./patch-diff"
+import { scrollLines, scrollWheel, wheelAcceleration } from "./scroll"
 import { useSyntax, useTheme, useThemeControls } from "./theme"
 
 const MIN_SPLIT_WIDTH = 100
@@ -54,6 +55,8 @@ export type ViewerPreferences = {
   readonly tree?: boolean
   readonly single?: boolean
   readonly view?: "auto" | "split" | "unified"
+  readonly scrollLines?: number
+  readonly scrollWheel?: number
 }
 
 export function DiffViewer(props: {
@@ -88,6 +91,8 @@ export function DiffViewer(props: {
   })
   const [treeEnabled, setTreeEnabled] = createSignal(props.preferences?.tree ?? true)
   const [single, setSingle] = createSignal(props.preferences?.single ?? false)
+  const [lineStep] = createSignal(scrollLines(props.preferences?.scrollLines))
+  const [wheelSpeed] = createSignal(scrollWheel(props.preferences?.scrollWheel))
   const [viewOverride, setViewOverride] = createSignal<"split" | "unified">()
   const [expandedNodes, setExpandedNodes] = createSignal<ReadonlySet<number>>(new Set())
   const [selectedFile, setSelectedFile] = createSignal<number>()
@@ -161,6 +166,10 @@ export function DiffViewer(props: {
 
   function page(direction: number, divisor = 1) {
     if (scroll) scroll.scrollBy(direction * Math.max(1, Math.floor(scroll.viewport.height / divisor)))
+  }
+
+  function scrollByLines(direction: number) {
+    if (scroll) scroll.scrollBy(direction * lineStep())
   }
 
   function toggleReviewed(fileIndex: number) {
@@ -282,12 +291,12 @@ export function DiffViewer(props: {
     }
     if (event.name === "down" || event.name === "j") {
       event.preventDefault()
-      page(1, scroll?.viewport.height ?? 1)
+      scrollByLines(1)
       return
     }
     if (event.name === "up" || event.name === "k") {
       event.preventDefault()
-      page(-1, scroll?.viewport.height ?? 1)
+      scrollByLines(-1)
       return
     }
     if (event.name === "pagedown" || (event.name === "f" && event.ctrl)) {
@@ -435,7 +444,10 @@ export function DiffViewer(props: {
               <box flexGrow={1} minWidth={0} minHeight={0}>
                 <box height={1} flexShrink={0} marginLeft={inset()} marginRight={inset()}
                   backgroundColor={theme.diff.background.context} />
-                <scrollbox id="diff-patches" ref={(element: ScrollBoxRenderable) => (scroll = element)}
+                <scrollbox id="diff-patches" ref={(element: ScrollBoxRenderable) => {
+                  scroll = element
+                  element.scrollAcceleration = wheelAcceleration(wheelSpeed)
+                }}
                   flexGrow={1} minHeight={0} verticalScrollbarOptions={{ visible: false }}
                   horizontalScrollbarOptions={{ visible: false }}>
                   <For each={visibleFiles()}>{(entry, index) => {

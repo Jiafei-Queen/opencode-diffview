@@ -63,12 +63,14 @@ ocdiff --list-themes
 
 Display options include `--theme <name>` (default `opencode2`),
 `--mode dark|light`, `--view auto|split|unified`, `--no-tree`, and `--single`.
+Scroll speed is adjustable with `--scroll-lines <1-20>` for `j`/`k` and arrow
+keys and `--scroll-wheel <0.25-5>` for the mouse wheel.
 
 ## Keys
 
 | Key | Action |
 | --- | --- |
-| `j` / `k`, arrows | Scroll |
+| `j` / `k`, arrows | Scroll (step set by `--scroll-lines`) |
 | `PgUp` / `PgDn`, `Ctrl+B` / `Ctrl+F` | Page up/down |
 | `Ctrl+U` / `Ctrl+D` | Half-page up/down |
 | `gg` / `G`, `Home` / `End` | Start/end |
