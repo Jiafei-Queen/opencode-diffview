@@ -33,6 +33,16 @@ test("accepts stdin and patch files", () => {
   expect(parseArguments(["--patch", "a.diff"])).toMatchObject({ type: "run", patch: "a.diff" })
 })
 
+test("opens and lists saved reviews", () => {
+  expect(parseArguments(["--list-saved"])).toEqual({ type: "saved" })
+  expect(parseArguments(["--open", "my review"])).toMatchObject({ type: "run", open: "my review" })
+  expect(parseArguments(["--open=my review", "--theme", "aura"])).toMatchObject({ type: "run", open: "my review", theme: "aura" })
+  expect(() => parseArguments(["--open", "review", "--source", "working"])).toThrow("--open")
+  expect(() => parseArguments(["--open", "review", "--base", "main"])).toThrow("--open")
+  expect(() => parseArguments(["--open", "review", "--patch", "a.diff"])).toThrow("--open")
+  expect(() => parseArguments(["--open", "review", "--list-saved"])).toThrow("--list-saved")
+})
+
 test("rejects conflicting or unknown arguments", () => {
   expect(() => parseArguments(["--patch", "a.diff", "--base", "main"])).toThrow("--base")
   expect(() => parseArguments(["--source", "turn"])).toThrow("--source")

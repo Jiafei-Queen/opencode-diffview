@@ -32,6 +32,15 @@ signals for source, base, selection, reviewed files, layout, and dialogs. It use
 OpenTUI keyboard handling directly. There is no router, panel host, plugin
 registry, background service, updater, or persistent OpenCode configuration.
 
+`DiffViewer` receives an optional `SnapshotPort` and never touches the
+filesystem itself. `src/store/snapshot.ts` implements the port: it writes one
+directory per named review under the machine state directory, validates metadata
+on read, and skips damaged entries when listing. `src/config/paths.ts` resolves
+`OCDIFF_STATE_HOME`, `XDG_STATE_HOME`, and the `~/.local/state` fallback.
+Saving a review is explicit (`Ctrl+S`); progress is persisted only after a
+review exists. Opening a saved review swaps the viewer's provider to a
+read-only `Saved` provider and restores reviewed markers.
+
 `PatchDiff` retains the upstream multi-hunk rendering and large-addition
 virtualization. Files over 3000 added lines are split into 128-line chunks;
 only the visible chunks and one chunk on either side are mounted. Highlighting
@@ -75,8 +84,11 @@ input may use a non-TTY stdin, but the process must be able to open `/dev/tty`
 - `test/git.test.ts`: real temporary Git repositories and source semantics
 - `test/file-tree.test.ts`: pure tree and navigation algorithms
 - `test/cli.test.ts`: argument validation
+- `test/snapshot.test.ts`: saved review storage, naming, progress, and validation
 - `test/viewer.test.tsx`: real OpenTUI frames, layouts, review, errors, and
   large-file mount counts
+- `test/viewer-snapshot.test.tsx`: saving, listing, opening, deleting, and
+  progress recording in the viewer
 - `test/viewer-source.test.tsx`: source/base keyboard workflows
 - `test/themes.test.ts`: theme resolution, mode fallback, labels, and cycling
 - `test/theme-switch.test.tsx`: real frames, syntax replacement, footer labels,

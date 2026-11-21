@@ -16,6 +16,7 @@ was extracted from.
 ## Features
 
 - File tree, addition/deletion counts, and reviewed markers
+- Named, self-contained review snapshots that survive branch and working-tree changes
 - Split and unified layouts with narrow-terminal fallback
 - File and hunk navigation, paging, and single-file mode
 - Branch, committed, and working-tree comparisons
@@ -59,6 +60,10 @@ ocdiff --theme tokyonight --mode light
 
 # Discover theme names
 ocdiff --list-themes
+
+# Save a review from the viewer with Ctrl+S, then reopen it later
+ocdiff --list-saved
+ocdiff --open "payments refactor"
 ```
 
 Display options include `--theme <name>` (default `opencode2`),
@@ -82,13 +87,16 @@ keys and `--scroll-wheel <0.25-5>` for the mouse wheel.
 | `d` | Choose source or base |
 | `t` / `T` | Next/previous color theme |
 | `m` | Mark file reviewed |
+| `Ctrl+S` / `S` | Save a named review snapshot |
+| `r` | Open saved reviews |
 | `?` | Help |
 | `q`, `Esc`, `Ctrl+C` | Close |
 
-Reviewed state, source/base, and the active theme last only for the current
-process. Image previews show the working tree only; committed and deleted images
-are never substituted with working-tree content. OpenCode session-based “Last
-turn” diffs are outside this tool's scope.
+Reviewed state and source/base last only for the current process unless the
+review is saved with `Ctrl+S`; saved reviews keep the diff, timestamps, and
+progress under the state directory. Image previews show the working tree only;
+committed and deleted images are never substituted with working-tree content.
+OpenCode session-based “Last turn” diffs are outside this tool's scope.
 
 ## npm packages
 
@@ -111,6 +119,7 @@ bun run build
 ```
 
 See [the architecture guide](docs/development/architecture.md),
+[saved reviews](docs/features/saved-reviews.md),
 [build and release notes](docs/development/release.md), and
 [upstream provenance](docs/development/upstream.md).
 

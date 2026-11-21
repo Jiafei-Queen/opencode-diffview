@@ -24,7 +24,10 @@ import {
   type DiffFile,
   type DiffMode,
   type DiffProvider,
+  type SnapshotPort,
+  type SnapshotSummary,
 } from "../model"
+import { defaultSnapshotName, formatBytes, formatTimestamp } from "../util/format"
 import { filetype } from "../util/filetype"
 import {
   allExpandedFileTreeDirectories,
@@ -50,6 +53,9 @@ type DialogState =
   | { type: "help" }
   | { type: "menu"; fileIndex: number }
   | { type: "image"; file: string; bytes: Uint8Array }
+  | { type: "save" }
+  | { type: "saved" }
+  | { type: "delete"; id: string; name: string }
 
 export type ViewerPreferences = {
   readonly tree?: boolean
@@ -59,10 +65,24 @@ export type ViewerPreferences = {
   readonly scrollWheel?: number
 }
 
+export type OpenSnapshot = {
+  readonly id: string
+  readonly name: string
+  readonly reviewed?: readonly string[]
+  readonly cwd?: string
+  readonly source?: string
+  readonly base?: string
+  readonly detail?: string
+  readonly opened?: boolean
+}
+
 export function DiffViewer(props: {
   provider: DiffProvider
   preferences?: ViewerPreferences
   onPreferencesChange?: (value: ViewerPreferences) => void
+  snapshots?: SnapshotPort
+  workspace?: string
+  snapshot?: OpenSnapshot
   onClose: () => void
 }) {
   const theme = useTheme()
@@ -70,13 +90,16 @@ export function DiffViewer(props: {
   const themeControls = useThemeControls()
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
+  const [activeProvider, setActiveProvider] = createSignal<DiffProvider>(props.provider)
   const [mode, setMode] = createSignal<DiffMode>(props.provider.initialMode)
   const [base, setBase] = createSignal<string>()
-  const input = createMemo(() => ({ source: mode(), base: base() }))
+  const [generation, setGeneration] = createSignal(0)
+  const input = createMemo(() => ({ provider: activeProvider(), source: mode(), base: base(), generation: generation() }))
   const [diff] = createResource(input, async (value) => {
     const controller = new AbortController()
     onCleanup(() => controller.abort())
-    return props.provider.diff({ ...value, signal: controller.signal })
+    const result = await value.provider.diff({ source: value.source, base: value.base, signal: controller.signal })
+    return { ...result, generation: value.generation }
   })
   const files = () => diff.loading || diff.error ? [] : (diff()?.files ?? [])
   const detail = () => diff.loading ? "Resolving diff…" : diff.error ? "Diff unavailable" : diff()?.detail
@@ -87,7 +110,7 @@ export function DiffViewer(props: {
   const [branches] = createResource(branchInput, async (search) => {
     const controller = new AbortController()
     onCleanup(() => controller.abort())
-    return props.provider.branches?.(search, controller.signal) ?? []
+    return activeProvider().branches?.(search, controller.signal) ?? []
   })
   const [treeEnabled, setTreeEnabled] = createSignal(props.preferences?.tree ?? true)
   const [single, setSingle] = createSignal(props.preferences?.single ?? false)
@@ -96,8 +119,24 @@ export function DiffViewer(props: {
   const [viewOverride, setViewOverride] = createSignal<"split" | "unified">()
   const [expandedNodes, setExpandedNodes] = createSignal<ReadonlySet<number>>(new Set())
   const [selectedFile, setSelectedFile] = createSignal<number>()
-  const [reviewed, setReviewed] = createSignal<ReadonlySet<string>>(new Set())
+  const [reviewed, setReviewed] = createSignal<ReadonlySet<string>>(new Set(props.snapshot?.reviewed ?? []))
+  const [currentSaved, setCurrentSaved] = createSignal<OpenSnapshot | undefined>(props.snapshot)
+  const [snapshotName, setSnapshotName] = createSignal("")
+  const [saveError, setSaveError] = createSignal<string>()
+  const [savedItems, setSavedItems] = createSignal<readonly SnapshotSummary[]>([])
+  const [savedError, setSavedError] = createSignal<string>()
+  const [savedLoading, setSavedLoading] = createSignal(false)
+  const [notice, setNotice] = createSignal("")
+  let restoreGeneration: number | undefined = props.snapshot === undefined ? undefined : 0
+  let savedSignature: string | undefined
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined
   const fileTree = createMemo(() => buildFileTree(files()))
+  const SAVED_ROWS = 8
+  const savedWindow = createMemo(() => {
+    const items = savedItems()
+    const start = Math.max(0, Math.min(dialogIndex() - SAVED_ROWS + 1, items.length - SAVED_ROWS))
+    return { start, items: items.slice(start, start + SAVED_ROWS) }
+  })
   const compact = createMemo(() => dimensions().width <= COMPACT_MAX_WIDTH)
   const showTree = createMemo(() => !compact() && treeEnabled() && files().length > 0)
   const treeWidth = createMemo(() => Math.max(30, Math.min(40, Math.floor(dimensions().width / 4))))
@@ -124,16 +163,55 @@ export function DiffViewer(props: {
     setExpandedNodes(allExpandedFileTreeDirectories(fileTree()))
     setSelectedFile(undefined)
     scroll?.scrollTo(0)
+    if (savedSignature !== undefined && currentSaved() && reviewSignature() !== savedSignature) {
+      savedSignature = undefined
+      setCurrentSaved(undefined)
+    }
   })
+
+  createEffect(() => {
+    if (diff.error) return
+    const result = diff()
+    const target = restoreGeneration
+    if (!result || target === undefined || result.generation !== target) return
+    restoreGeneration = undefined
+    const marked = reviewed()
+    const index = Math.max(0, result.files.findIndex((file) => !marked.has(file.file)))
+    setSelectedFile(index)
+    renderer.requestAnimationFrame(() => scrollToFile(index))
+  })
+
+  // Review progress is only persisted after the review has been saved explicitly.
+  let progressTimer: ReturnType<typeof setTimeout> | undefined
+  let progressQueue: Promise<void> = Promise.resolve()
+  createEffect(() => {
+    const current = currentSaved()
+    const names = reviewed()
+    const port = props.snapshots
+    if (!current || !port) return
+    clearTimeout(progressTimer)
+    progressTimer = setTimeout(() => {
+      progressQueue = progressQueue
+        .then(() => port.updateProgress(current.id, [...names]))
+        .catch(() => {})
+    }, 150)
+  })
+  onCleanup(() => clearTimeout(progressTimer))
 
   function currentFileIndex(): number | undefined {
     const candidates = single() && selectedFile() !== undefined ? [selectedFile()!] : fileIndexes()
     if (!scroll) return selectedFile() ?? candidates[0]
     const top = scroll.scrollTop
+    const selected = selectedFile()
+    if (selected !== undefined && candidates.includes(selected)) {
+      const node = patchNodes.get(selected)
+      const position = node ? node.y - scroll.content.y : undefined
+      if (position !== undefined && position >= top && position < top + scroll.viewport.height) return selected
+    }
     return candidates.findLast((fileIndex) => {
       const node = patchNodes.get(fileIndex)
       return node ? node.y - scroll!.content.y <= top + 1 : false
-    }) ?? selectedFile() ?? candidates[0]
+    }) ?? selected ?? candidates[0]
   }
 
   function scrollToFile(fileIndex: number | undefined) {
@@ -188,6 +266,127 @@ export function DiffViewer(props: {
     }
   }
 
+  function showNotice(text: string) {
+    setNotice(text)
+    clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => setNotice(""), 4000)
+  }
+
+  function openSaveDialog() {
+    if (!props.snapshots) return
+    const saved = currentSaved()
+    setSnapshotName(saved?.name ?? defaultSnapshotName(props.workspace ?? "", sourceLabel()))
+    setSaveError(undefined)
+    setDialogIndex(0)
+    setQuery("")
+    setDialog({ type: "save" })
+  }
+
+  async function submitSave() {
+    const port = props.snapshots
+    if (!port) return
+    const currentFiles = files()
+    if (currentFiles.length === 0) {
+      setSaveError("There are no changes to save.")
+      return
+    }
+    const current = currentSaved()
+    const opened = current?.opened === true
+    try {
+      const saved = await port.save({
+        id: current?.id,
+        name: snapshotName(),
+        cwd: opened ? current.cwd ?? props.workspace ?? "" : props.workspace ?? "",
+        source: opened ? current.source ?? sourceLabel() : sourceLabel(),
+        base: opened ? current.base : base() ?? diff()?.base,
+        detail: opened ? current.detail : detail(),
+        files: currentFiles,
+        reviewed: [...reviewed()],
+      })
+      setCurrentSaved({
+        id: saved.id,
+        name: saved.name,
+        reviewed: [...reviewed()],
+        cwd: saved.cwd,
+        source: saved.source,
+        base: saved.base,
+        detail: saved.detail,
+        opened: current?.opened,
+      })
+      savedSignature = reviewSignature()
+      closeDialog()
+      showNotice(`Saved “${saved.name}”`)
+    } catch (error) {
+      setSaveError(errorMessage(error))
+    }
+  }
+
+  async function loadSavedReviews() {
+    const port = props.snapshots
+    if (!port) return
+    setSavedLoading(true)
+    setSavedError(undefined)
+    try {
+      setSavedItems(await port.list())
+    } catch (error) {
+      setSavedItems([])
+      setSavedError(errorMessage(error))
+    } finally {
+      setSavedLoading(false)
+    }
+  }
+
+  function openSavedReviews() {
+    if (!props.snapshots) return
+    setDialogIndex(0)
+    setQuery("")
+    setDialog({ type: "saved" })
+    void loadSavedReviews()
+  }
+
+  async function openSaved(item: SnapshotSummary) {
+    const port = props.snapshots
+    if (!port) return
+    try {
+      const opened = await port.open(item.id)
+      const next = generation() + 1
+      setGeneration(next)
+      restoreGeneration = next
+      setActiveProvider(opened.provider)
+      setMode(opened.provider.initialMode)
+      setBase(undefined)
+      setCurrentSaved({
+        id: opened.summary.id,
+        name: opened.summary.name,
+        reviewed: opened.summary.reviewed,
+        cwd: opened.summary.cwd,
+        source: opened.summary.source,
+        base: opened.summary.base,
+        detail: opened.summary.detail,
+        opened: true,
+      })
+      setReviewed(new Set(opened.summary.reviewed))
+      savedSignature = `saved\u0000${opened.summary.id}`
+      closeDialog()
+      showNotice(`Opened “${opened.summary.name}”`)
+    } catch (error) {
+      setSavedError(errorMessage(error))
+    }
+  }
+
+  async function deleteSaved(target: Extract<DialogState, { type: "delete" }>) {
+    const port = props.snapshots
+    if (!port) return
+    try {
+      await port.remove(target.id)
+      closeDialog()
+      showNotice(`Deleted “${target.name}”`)
+      void loadSavedReviews()
+    } catch (error) {
+      setSavedError(errorMessage(error))
+    }
+  }
+
   function openDialog(state: DialogState) {
     setDialogIndex(0)
     setQuery("")
@@ -209,9 +408,19 @@ export function DiffViewer(props: {
     openDialog({ type: "menu", fileIndex })
   }
 
+  function sourceLabel() {
+    return activeProvider().label ?? SOURCE_LABELS[mode()].label
+  }
+
+  function reviewSignature() {
+    const current = currentSaved()
+    if (current?.opened) return `saved\u0000${current.id}`
+    return [mode(), base() ?? "", detail() ?? ""].join("\u0000")
+  }
+
   function sourceOptions() {
     return [
-      ...props.provider.modes.map((value) => ({
+      ...activeProvider().modes.map((value) => ({
         title: SOURCE_LABELS[value].label,
         description: SOURCE_LABELS[value].description,
         select: () => {
@@ -219,7 +428,7 @@ export function DiffViewer(props: {
           setDialog(undefined)
         },
       })),
-      ...(props.provider.branches ? [{
+      ...(activeProvider().branches ? [{
         title: "Base",
         description: diff.error ? "Unavailable" : diff()?.base ?? "Choose…",
         select: () => openDialog({ type: "base" }),
@@ -234,7 +443,8 @@ export function DiffViewer(props: {
   useKeyboard((event) => {
     const currentDialog = dialog()
     if (currentDialog) {
-      if (event.name === "escape" || event.name === "q" && currentDialog.type !== "base" || (event.name === "c" && event.ctrl)) {
+      const textInput = currentDialog.type === "base" || currentDialog.type === "save"
+      if (event.name === "escape" || event.name === "q" && !textInput || (event.name === "c" && event.ctrl)) {
         event.preventDefault()
         closeDialog()
         return
@@ -244,6 +454,54 @@ export function DiffViewer(props: {
         if (event.name === "return" || event.name === "?") {
           event.preventDefault()
           closeDialog()
+        }
+        return
+      }
+      if (currentDialog.type === "save") {
+        if (event.name === "return") {
+          event.preventDefault()
+          void submitSave()
+        }
+        return
+      }
+      if (currentDialog.type === "delete") {
+        if (event.name === "down" || event.name === "j" || event.name === "up" || event.name === "k") {
+          event.preventDefault()
+          setDialogIndex((index) => index === 0 ? 1 : 0)
+          return
+        }
+        if (event.name === "return") {
+          event.preventDefault()
+          if (dialogIndex() === 0) void deleteSaved(currentDialog)
+          else closeDialog()
+        }
+        return
+      }
+      if (currentDialog.type === "saved") {
+        const items = savedItems()
+        if (event.name === "down" || event.name === "j") {
+          event.preventDefault()
+          setDialogIndex((index) => Math.min(Math.max(0, items.length - 1), index + 1))
+          return
+        }
+        if (event.name === "up" || event.name === "k") {
+          event.preventDefault()
+          setDialogIndex((index) => Math.max(0, index - 1))
+          return
+        }
+        if (event.name === "d" && !event.ctrl) {
+          event.preventDefault()
+          const item = items[dialogIndex()]
+          if (item) {
+            setDialogIndex(0)
+            setDialog({ type: "delete", id: item.id, name: item.name })
+          }
+          return
+        }
+        if (event.name === "return") {
+          event.preventDefault()
+          const item = items[dialogIndex()]
+          if (item) void openSaved(item)
         }
         return
       }
@@ -278,6 +536,16 @@ export function DiffViewer(props: {
       }
       if (currentDialog.type === "base") return
       if (currentDialog.type === "source" || currentDialog.type === "menu") return
+    }
+    if (event.name === "s" && (event.ctrl || event.shift)) {
+      event.preventDefault()
+      openSaveDialog()
+      return
+    }
+    if (event.name === "r" && !event.ctrl && !event.meta && !event.option) {
+      event.preventDefault()
+      openSavedReviews()
+      return
     }
     if (event.name === "t" && !event.ctrl && !event.meta && !event.option) {
       event.preventDefault()
@@ -372,7 +640,7 @@ export function DiffViewer(props: {
       renderer.requestAnimationFrame(() => scrollToFile(currentFileIndex()))
       return
     }
-    if (event.name === "d" && props.provider.modes.length > 1) {
+    if (event.name === "d" && activeProvider().modes.length > 1) {
       event.preventDefault()
       openDialog({ type: "source" })
       return
@@ -407,7 +675,7 @@ export function DiffViewer(props: {
 
   const footer = (
     <box flexDirection="row" gap={1} width="100%">
-      <text fg={theme.text.muted} wrapMode="none" truncate flexGrow={1}>{themeControls.label()}</text>
+      <text fg={theme.text.muted} wrapMode="none" truncate flexGrow={1}>{notice() || themeControls.label()}</text>
       <Help />
     </box>
   )
@@ -419,7 +687,7 @@ export function DiffViewer(props: {
           flexDirection="row" gap={1}>
           <box flexDirection="row" flexGrow={1} minWidth={0} onMouseUp={() => openDialog({ type: "source" })}>
             <text fg={theme.text.action.secondary.base} attributes={TextAttributes.BOLD} wrapMode="none">
-              {SOURCE_LABELS[mode()].label}
+              {sourceLabel()}
             </text>
             <Show when={detail()}><text fg={theme.text.muted} wrapMode="none" truncate>{` · ${detail()}`}</text></Show>
           </box>
@@ -437,8 +705,8 @@ export function DiffViewer(props: {
                 <DiffViewerFileTree files={files()} loading={diff.loading} error={diff.error} width={treeWidth()}
                   selectedFileIndex={selectedFile() ?? currentFileIndex()} reviewedFileNames={reviewed()}
                   expandedNodes={expandedNodes()} onRowClick={clickRow} onFileContextMenu={openFileMenu}
-                  source={SOURCE_LABELS[mode()].label} sourceDetail={detail()}
-                  onSwitchSource={props.provider.modes.length > 1 ? () => openDialog({ type: "source" }) : undefined}
+                  source={sourceLabel()} sourceDetail={detail()}
+                  onSwitchSource={activeProvider().modes.length > 1 ? () => openDialog({ type: "source" }) : undefined}
                   footer={footer} />
               </Show>
               <box flexGrow={1} minWidth={0} minHeight={0}>
@@ -486,7 +754,7 @@ export function DiffViewer(props: {
                                 </text>
                               </box>
                             }>
-                              <Match when={mode() !== "committed" && entry.file.status !== "deleted" && image() && props.provider.loadImage}>
+                              <Match when={mode() !== "committed" && entry.file.status !== "deleted" && image() && activeProvider().loadImage}>
                                 {(load) => <DiffViewerImage file={entry.file.file} load={load()}
                                   onEnlarge={(bytes) => openDialog({ type: "image", file: entry.file.file, bytes })} />}
                               </Match>
@@ -552,12 +820,13 @@ export function DiffViewer(props: {
           </DialogFrame>
         </Show>
         <Show when={state().type === "help"}>
-          <DialogFrame title="Diff shortcuts" width={68}>
+          <DialogFrame title="Diff shortcuts" width={68} gap={0}>
             <For each={[
               ["j/k, ↓/↑", "Scroll"], ["PgUp/PgDn, ctrl+b/f", "Page"], ["ctrl+u/d", "Half page"],
               ["gg/G, Home/End", "Start/end"], ["[/]", "Previous/next hunk"], ["n/p", "Previous/next file"],
               ["b", "Toggle file tree"], ["s", "Single file"], ["v", "Split/unified"], ["d", "Diff source"],
-              ["m", "Mark reviewed"], ["t / T", "Next/previous theme"], ["q/Esc", "Close"],
+              ["m", "Mark reviewed"], ["ctrl+s / S", "Save review"], ["r", "Saved reviews"],
+              ["t / T", "Next/previous theme"], ["q/Esc", "Close"],
             ]}>{([key, label]) => <box flexDirection="row"><text width={24} fg={theme.text.base}>{key}</text>
               <text fg={theme.text.muted}>{label}</text></box>}</For>
           </DialogFrame>
@@ -571,6 +840,72 @@ export function DiffViewer(props: {
               } },
               { title: "Cancel", description: "Close menu", select: closeDialog }]}
             index={dialogIndex()} onSelect={setDialogIndex} />
+        </Show>
+        <Show when={state().type === "save"}>
+          <DialogFrame title={currentSaved() ? "Update saved review" : "Save review"} width={76}>
+            <text fg={theme.text.muted} wrapMode="none">
+              {`${files().length} files · ${reviewed().size} reviewed. The current diff is stored as a snapshot.`}
+            </text>
+            <input placeholder="Review name" value={snapshotName()}
+              onInput={(value) => {
+                setSnapshotName(value)
+                setSaveError(undefined)
+              }}
+              ref={(element: InputRenderable) => queueMicrotask(() => element.focus())}
+              focusedTextColor={theme.text.base} focusedBackgroundColor={theme.background.raised.base}
+              placeholderColor={theme.text.muted} cursorColor={theme.text.base} />
+            <Show when={saveError()} fallback={<text fg={theme.text.muted}>enter save · esc cancel</text>}>
+              <text fg={theme.text.feedback.error.base}>{saveError()}</text>
+            </Show>
+          </DialogFrame>
+        </Show>
+        <Show when={state().type === "saved"}>
+          <DialogFrame title="Saved reviews" width={88}>
+            <Show when={!savedLoading()} fallback={<text fg={theme.text.muted}>Loading saved reviews…</text>}>
+              <Show when={!savedError()} fallback={<text fg={theme.text.feedback.error.base}>{savedError()}</text>}>
+                <Show when={savedItems().length > 0}
+                  fallback={<text fg={theme.text.muted}>No saved reviews yet. Press ctrl+s to save the current diff.</text>}>
+                  <For each={savedWindow().items}>{(review, index) => {
+                    const selected = () => dialogIndex() === savedWindow().start + index()
+                    const complete = () => review.fileCount > 0 && review.reviewed.length >= review.fileCount
+                    return (
+                      <box id={`saved-review-${review.id}`} flexDirection="row" gap={1} height={1}
+                        backgroundColor={selected() ? theme.background.action.primary.focused : undefined}
+                        onMouseUp={(event) => {
+                          if (event.button !== MouseButton.LEFT) return
+                          event.stopPropagation()
+                          setDialogIndex(savedWindow().start + index())
+                        }}>
+                        <text fg={selected() ? theme.text.action.primary.focused : theme.text.base}
+                          flexGrow={1} minWidth={0} wrapMode="none" truncate>
+                          {`${complete() ? "✓ " : ""}${review.name}`}
+                        </text>
+                        <text fg={theme.text.muted} flexShrink={0} wrapMode="none">
+                          {`${review.source} · ${review.reviewed.length}/${review.fileCount} · ${formatBytes(review.bytes)} · ${formatTimestamp(review.updatedAt)}`}
+                        </text>
+                      </box>
+                    )
+                  }}</For>
+                </Show>
+              </Show>
+            </Show>
+            <text fg={theme.text.muted}>enter open · d delete · esc close</text>
+          </DialogFrame>
+        </Show>
+        <Show when={state().type === "delete" ? (state() as Extract<DialogState, { type: "delete" }>) : undefined} keyed>
+          {(target) => (
+            <DialogFrame title="Delete saved review" width={70}>
+              <text fg={theme.text.base} wrapMode="none" truncate>{`Delete “${target.name}”?`}</text>
+              <text fg={theme.text.muted}>The saved diff will be removed from disk.</text>
+              <For each={["Delete", "Cancel"]}>{(label, index) =>
+                <PickerRow title={label} selected={dialogIndex() === index()} onMouseUp={() => {
+                  setDialogIndex(index())
+                  if (index() === 0) void deleteSaved(target)
+                  else closeDialog()
+                }} />}</For>
+              <text fg={theme.text.muted}>enter select · esc cancel</text>
+            </DialogFrame>
+          )}
         </Show>
         <Show when={state().type === "image" ? (state() as Extract<DialogState, { type: "image" }>) : undefined} keyed>
           {(image) => (
@@ -612,12 +947,12 @@ export function DiffViewer(props: {
         {props.title}</text><Show when={props.description}><text fg={theme.text.muted}>{props.description}</text></Show></box>
   }
 
-  function DialogFrame(props: { title: string; width: number; children: import("solid-js").JSX.Element }) {
+  function DialogFrame(props: { title: string; width: number; gap?: number; children: import("solid-js").JSX.Element }) {
     return <box position="absolute" left={0} top={0} width={dimensions().width} height={dimensions().height}
       zIndex={3000} alignItems="center" justifyContent="center" backgroundColor={theme.background.base}>
       <box width={Math.min(props.width, Math.max(20, dimensions().width - 4))} maxHeight={dimensions().height - 2}
         border borderColor={theme.border.base} backgroundColor={theme.background.raised.base}
-        paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="column" gap={1}>
+        paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="column" gap={props.gap ?? 1}>
         <text attributes={TextAttributes.BOLD} fg={theme.text.base}>{props.title}</text>{props.children}
       </box>
     </box>

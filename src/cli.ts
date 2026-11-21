@@ -12,12 +12,14 @@ export type CliArguments =
   | { type: "help" }
   | { type: "version" }
   | { type: "themes" }
+  | { type: "saved" }
   | {
       type: "run"
       cwd: string
       source: DiffSource
       base?: string
       patch?: string
+      open?: string
       theme: string
       mode: ThemeMode
       preferences: ViewerPreferences
@@ -35,6 +37,9 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   let single = false
   let scrollLines: number | undefined
   let scrollWheel: number | undefined
+  let open: string | undefined
+  let saved = false
+  let sourceExplicit = false
   let help = false
   let version = false
   let themes = false
@@ -58,6 +63,10 @@ export function parseArguments(argv: readonly string[]): CliArguments {
       themes = true
       continue
     }
+    if (argument === "--list-saved") {
+      saved = true
+      continue
+    }
     if (argument === "--no-tree") {
       tree = false
       continue
@@ -74,9 +83,13 @@ export function parseArguments(argv: readonly string[]): CliArguments {
       return next
     }
     if (flag === "--cwd") cwd = value()
-    else if (flag === "--source") source = parseChoice(flag, value(), ["branch", "committed", "working"])
+    else if (flag === "--source") {
+      source = parseChoice(flag, value(), ["branch", "committed", "working"])
+      sourceExplicit = true
+    }
     else if (flag === "--base") base = value()
     else if (flag === "--patch") patch = value()
+    else if (flag === "--open") open = value()
     else if (flag === "--theme") {
       const name = value()
       if (!hasTheme(name)) throw new Error(`Unknown theme: ${name}. Use --list-themes.`)
@@ -91,6 +104,12 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   if (help) return { type: "help" }
   if (version) return { type: "version" }
   if (themes) return { type: "themes" }
+  if (saved) {
+    if (open) throw new Error("--open cannot be used with --list-saved.")
+    return { type: "saved" }
+  }
+  if (open && patch) throw new Error("--open cannot be used with patch input.")
+  if (open && (base || sourceExplicit)) throw new Error("--open cannot be used with --base or --source.")
   if (patch && base) throw new Error("--base cannot be used with patch input.")
   if (patch && source !== "branch") throw new Error("--source cannot be used with patch input.")
   return {
@@ -99,6 +118,7 @@ export function parseArguments(argv: readonly string[]): CliArguments {
     source,
     base,
     patch,
+    ...(open === undefined ? {} : { open }),
     theme,
     mode,
     preferences: {
@@ -142,6 +162,10 @@ Input:
   --patch <file>             Read a unified diff from a file; use - for stdin
   -                          Read a unified diff from stdin
 
+Saved reviews:
+  --list-saved               List saved reviews
+  --open <name|id>           Open a saved review snapshot
+
 Display:
   --theme <name>             Color theme (default: opencode2)
   --mode <mode>              dark or light (default: dark)
@@ -158,5 +182,6 @@ Other:
 
 Keys:
   j/k scroll  [/] hunks  n/p files  b tree  s single  v view
-  d source  t/T theme  m reviewed  ? help  q/Esc close
+  d source  t/T theme  m reviewed  ctrl+s save  r saved  ? help
+  q/Esc close
 `
