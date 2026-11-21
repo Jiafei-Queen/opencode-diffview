@@ -58,6 +58,7 @@ export type SnapshotSummary = {
 
 /** UI-facing boundary for saved reviews; the viewer does not touch the filesystem. */
 export type SnapshotPort = {
+  readonly writable?: boolean
   list(): Promise<readonly SnapshotSummary[]>
   save(draft: SnapshotDraft): Promise<SnapshotSummary>
   updateProgress(id: string, reviewed: readonly string[]): Promise<void>

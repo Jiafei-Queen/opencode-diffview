@@ -71,6 +71,17 @@ provider's `loadImage`; clicking it opens a local enlarge dialog. Committed
 comparisons never show the working-tree image, and deleted images have no
 previous-revision preview.
 
+## Configuration
+
+`src/config/settings.ts` owns the settings schema, per-field validation, and CLI
+override merging. `src/config/paths.ts` resolves the XDG config and state
+directories. Interactive viewer changes flow through `onPreferencesChange` and
+the theme provider's `onChange` callback to a serialized writer in
+`src/index.ts`; command-line overrides never reach that writer. `--no-save`
+disables the writer and wraps the snapshot port in a read-only adapter.
+`src/config/io.ts` provides the shared atomic JSON read/write helpers used by
+both settings and saved reviews.
+
 ## Lifecycle
 
 `src/ui/app.tsx` owns the OpenTUI renderer. Closing the viewer destroys the
@@ -84,9 +95,11 @@ input may use a non-TTY stdin, but the process must be able to open `/dev/tty`
 - `test/git.test.ts`: real temporary Git repositories and source semantics
 - `test/file-tree.test.ts`: pure tree and navigation algorithms
 - `test/cli.test.ts`: argument validation
+- `test/settings.test.ts`: config defaults, validation, overrides, and disk round-trips
 - `test/snapshot.test.ts`: saved review storage, naming, progress, and validation
 - `test/viewer.test.tsx`: real OpenTUI frames, layouts, review, errors, and
   large-file mount counts
+- `test/viewer-settings.test.tsx`: persisted preferences and layout callbacks
 - `test/viewer-snapshot.test.tsx`: saving, listing, opening, deleting, and
   progress recording in the viewer
 - `test/viewer-source.test.tsx`: source/base keyboard workflows

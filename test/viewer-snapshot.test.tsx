@@ -113,6 +113,25 @@ test("help lists the review shortcuts", async () => {
   }
 })
 
+test("refuses to save a read-only review port", async () => {
+  const memory = memoryPort()
+  const app = await testRender(() => (
+    <ThemeProvider mode="dark">
+      <DiffViewer provider={createPatchProvider(MODIFIED_PATCH)}
+        snapshots={{ ...memory.port, writable: false }} workspace="/tmp/demo" onClose={() => {}} />
+    </ThemeProvider>
+  ), { width: 120, height: 30, kittyKeyboard: true })
+  try {
+    await settle(app)
+    app.mockInput.pressKey("s", { ctrl: true })
+    await settle(app)
+    expect(app.captureCharFrame()).toContain("Saving disabled")
+    expect(memory.drafts).toEqual([])
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
 test("lists, opens, and deletes a saved review", async () => {
   const memory = memoryPort()
   const app = await testRender(() => (

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import type {
   DiffFile,
@@ -8,6 +8,7 @@ import type {
   SnapshotPort,
   SnapshotSummary,
 } from "../model"
+import { readJsonFile, writeJsonFile } from "../config/io"
 import { snapshotsDirectory } from "../config/paths"
 
 const VERSION = 1
@@ -40,12 +41,8 @@ type StoredDiff = { readonly version: number; readonly files: readonly DiffFile[
 export function createSnapshotStore(directory = snapshotsDirectory()): SnapshotPort {
   async function readMeta(id: string): Promise<StoredMeta | undefined> {
     if (!ID_PATTERN.test(id)) return
-    try {
-      const value: unknown = JSON.parse(await readFile(path.join(directory, id, "meta.json"), "utf8"))
-      return isMeta(value, id) ? value : undefined
-    } catch {
-      return
-    }
+    const value = await readJsonFile(path.join(directory, id, "meta.json"))
+    return isMeta(value, id) ? value : undefined
   }
 
   async function directorySize(id: string) {
@@ -74,7 +71,7 @@ export function createSnapshotStore(directory = snapshotsDirectory()): SnapshotP
   }
 
   async function writeMeta(meta: StoredMeta) {
-    await writeJson(path.join(directory, meta.id, "meta.json"), meta)
+    await writeJsonFile(path.join(directory, meta.id, "meta.json"), meta)
   }
 
   async function resolve(idOrName: string): Promise<StoredMeta | undefined> {
@@ -126,7 +123,7 @@ export function createSnapshotStore(directory = snapshotsDirectory()): SnapshotP
       }
       const diff: StoredDiff = { version: VERSION, files: draft.files }
       await mkdir(path.join(directory, id), { recursive: true, mode: 0o700 })
-      await writeJson(path.join(directory, id, "diff.json"), diff)
+      await writeJsonFile(path.join(directory, id, "diff.json"), diff)
       await writeMeta(meta)
       return summarize(meta)
     },
@@ -179,6 +176,21 @@ export function createSavedProvider(files: readonly DiffFile[], name: string): D
   }
 }
 
+/** Keeps listing and opening available while blocking every write. */
+export function readOnlySnapshotPort(store: SnapshotPort): SnapshotPort {
+  const deny = async (): Promise<never> => {
+    throw new Error("Saving is disabled by --no-save.")
+  }
+  return {
+    list: () => store.list(),
+    open: (id) => store.open(id),
+    writable: false,
+    save: deny,
+    updateProgress: deny,
+    remove: deny,
+  }
+}
+
 function newId() {
   return `${Date.now().toString(36)}-${randomUUID().slice(0, 6)}`
 }
@@ -191,18 +203,6 @@ function normalizeName(input: string) {
   }
   if (/[\u0000-\u001f\u007f]/.test(name)) throw new Error("A saved review name cannot contain control characters.")
   return name
-}
-
-async function writeJson(file: string, value: unknown) {
-  const temporary = `${file}.${randomUUID()}.tmp`
-  await writeFile(temporary, `${JSON.stringify(value, undefined, 2)}\n`, { mode: 0o600 })
-  try {
-    await rename(temporary, file)
-  } catch {
-    // Windows does not replace an existing target with rename.
-    await rm(file, { force: true })
-    await rename(temporary, file)
-  }
 }
 
 function summary(meta: StoredMeta, bytes: number): SnapshotSummary {

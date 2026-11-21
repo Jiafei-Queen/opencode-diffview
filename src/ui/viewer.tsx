@@ -146,16 +146,16 @@ export function DiffViewer(props: {
   const view = createMemo(() => splitAvailable()
     ? viewOverride() ?? (props.preferences?.view === "unified" ? "unified" : "split")
     : "unified")
+  const patchNodes = new Map<number, BoxRenderable>()
+  const patchDiffs = new Map<number, PatchDiffRef>()
+  let scroll: ScrollBoxRenderable | undefined
+  const fileIndexes = createMemo(() => files().map((_, index) => index))
   const visibleFiles = createMemo((): { file: DiffFile; fileIndex: number }[] => {
     const all = files().map((file, fileIndex) => ({ file, fileIndex }))
     if (!single()) return all
     const current = selectedFile() ?? currentFileIndex() ?? 0
     return all.filter((entry) => entry.fileIndex === current)
   })
-  const fileIndexes = createMemo(() => files().map((_, index) => index))
-  const patchNodes = new Map<number, BoxRenderable>()
-  const patchDiffs = new Map<number, PatchDiffRef>()
-  let scroll: ScrollBoxRenderable | undefined
   let lastG = false
 
   createEffect(() => {
@@ -188,7 +188,7 @@ export function DiffViewer(props: {
     const current = currentSaved()
     const names = reviewed()
     const port = props.snapshots
-    if (!current || !port) return
+    if (!current || !port || port.writable === false) return
     clearTimeout(progressTimer)
     progressTimer = setTimeout(() => {
       progressQueue = progressQueue
@@ -273,7 +273,12 @@ export function DiffViewer(props: {
   }
 
   function openSaveDialog() {
-    if (!props.snapshots) return
+    const port = props.snapshots
+    if (!port) return
+    if (port.writable === false) {
+      showNotice("Saving disabled.")
+      return
+    }
     const saved = currentSaved()
     setSnapshotName(saved?.name ?? defaultSnapshotName(props.workspace ?? "", sourceLabel()))
     setSaveError(undefined)
@@ -491,6 +496,10 @@ export function DiffViewer(props: {
         }
         if (event.name === "d" && !event.ctrl) {
           event.preventDefault()
+          if (props.snapshots?.writable === false) {
+            showNotice("Saving disabled.")
+            return
+          }
           const item = items[dialogIndex()]
           if (item) {
             setDialogIndex(0)

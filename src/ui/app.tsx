@@ -14,6 +14,8 @@ export async function runViewer(options: {
   snapshots?: SnapshotPort
   workspace?: string
   snapshot?: OpenSnapshot
+  onThemeChange?: (name: string) => void
+  onPreferencesChange?: (value: ViewerPreferences) => void
   stdin?: ReadStream
 }) {
   const renderer = await createCliRenderer({
@@ -28,9 +30,10 @@ export async function runViewer(options: {
   })
   try {
     await render(() => (
-      <ThemeProvider mode={options.mode} theme={options.theme}>
+      <ThemeProvider mode={options.mode} theme={options.theme} onChange={options.onThemeChange}>
         <DiffViewer provider={options.provider} preferences={options.preferences}
           snapshots={options.snapshots} workspace={options.workspace} snapshot={options.snapshot}
+          onPreferencesChange={options.onPreferencesChange}
           onClose={() => renderer.destroy()} />
       </ThemeProvider>
     ), renderer)

@@ -13,3 +13,12 @@ export function stateRoot(env: NodeJS.ProcessEnv = process.env, home = homedir()
 export function snapshotsDirectory(env?: NodeJS.ProcessEnv, home?: string) {
   return path.join(stateRoot(env, home), "saved")
 }
+
+/** Root of human-editable configuration. */
+export function configRoot(env: NodeJS.ProcessEnv = process.env, home = homedir()) {
+  return xdgRoot(env.OCDIFF_CONFIG_HOME, env.XDG_CONFIG_HOME ?? "", home, ".config")
+}
+
+export function settingsFile(env?: NodeJS.ProcessEnv, home?: string) {
+  return path.join(configRoot(env, home), "config.json")
+}

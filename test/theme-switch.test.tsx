@@ -132,6 +132,26 @@ test("typing t in the base search does not switch themes", async () => {
   }
 })
 
+test("reports theme changes to the host", async () => {
+  const names: string[] = []
+  const app = await testRender(() => (
+    <ThemeProvider mode="dark" onChange={(name) => names.push(name)}>
+      <DiffViewer provider={branchProvider()} onClose={() => {}} />
+    </ThemeProvider>
+  ), { width: 120, height: 30, kittyKeyboard: true })
+  try {
+    await settle(app)
+    app.mockInput.pressKey("t")
+    await settle(app)
+    expect(names).toEqual([nextTheme("opencode2", 1)])
+    app.mockInput.pressKey("t", { shift: true })
+    await settle(app)
+    expect(names).toEqual([nextTheme("opencode2", 1), "opencode2"])
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
 function probeValue(frame: string) {
   const match = /(opencode2|opencode|[a-z][a-z0-9-]*)\|(#[0-9a-f]{6,8})\|(\d+)/.exec(frame)
   if (!match) throw new Error("Theme probe not found")

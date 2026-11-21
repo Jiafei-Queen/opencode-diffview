@@ -1,12 +1,12 @@
 import type { DiffSource } from "./model"
+import type { SettingsOverrides, ViewMode } from "./config/settings"
 import {
   SCROLL_LINES_MAX,
   SCROLL_LINES_MIN,
   SCROLL_WHEEL_MAX,
   SCROLL_WHEEL_MIN,
 } from "./ui/scroll"
-import { DEFAULT_THEME, hasTheme, type ThemeMode } from "./ui/themes"
-import type { ViewerPreferences } from "./ui/viewer"
+import { hasTheme, type ThemeMode } from "./ui/themes"
 
 export type CliArguments =
   | { type: "help" }
@@ -20,9 +20,8 @@ export type CliArguments =
       base?: string
       patch?: string
       open?: string
-      theme: string
-      mode: ThemeMode
-      preferences: ViewerPreferences
+      noSave: boolean
+      overrides: SettingsOverrides
     }
 
 export function parseArguments(argv: readonly string[]): CliArguments {
@@ -30,14 +29,15 @@ export function parseArguments(argv: readonly string[]): CliArguments {
   let source: DiffSource = "branch"
   let base: string | undefined
   let patch: string | undefined
-  let theme = DEFAULT_THEME
-  let mode: ThemeMode = "dark"
-  let view: ViewerPreferences["view"] = "auto"
-  let tree = true
-  let single = false
+  let theme: string | undefined
+  let mode: ThemeMode | undefined
+  let view: ViewMode | undefined
+  let tree: boolean | undefined
+  let single: boolean | undefined
   let scrollLines: number | undefined
   let scrollWheel: number | undefined
   let open: string | undefined
+  let noSave = false
   let saved = false
   let sourceExplicit = false
   let help = false
@@ -73,6 +73,10 @@ export function parseArguments(argv: readonly string[]): CliArguments {
     }
     if (argument === "--single") {
       single = true
+      continue
+    }
+    if (argument === "--no-save") {
+      noSave = true
       continue
     }
     const [flag, inline] = argument.split("=", 2)
@@ -119,12 +123,13 @@ export function parseArguments(argv: readonly string[]): CliArguments {
     base,
     patch,
     ...(open === undefined ? {} : { open }),
-    theme,
-    mode,
-    preferences: {
-      view,
-      tree,
-      single,
+    noSave,
+    overrides: {
+      ...(theme === undefined ? {} : { theme }),
+      ...(mode === undefined ? {} : { mode }),
+      ...(view === undefined ? {} : { view }),
+      ...(tree === undefined ? {} : { tree }),
+      ...(single === undefined ? {} : { single }),
       ...(scrollLines === undefined ? {} : { scrollLines }),
       ...(scrollWheel === undefined ? {} : { scrollWheel }),
     },
@@ -167,10 +172,10 @@ Saved reviews:
   --open <name|id>           Open a saved review snapshot
 
 Display:
-  --theme <name>             Color theme (default: opencode2)
-  --mode <mode>              dark or light (default: dark)
+  --theme <name>             Color theme (default: config or opencode2)
+  --mode <mode>              dark or light (default: config or dark)
   --list-themes              List available color themes
-  --view <mode>              auto, split, or unified (default: auto)
+  --view <mode>              auto, split, or unified (default: config or auto)
   --scroll-lines <n>         Lines per j/k or arrow key (1-20, default: 1)
   --scroll-wheel <n>         Mouse wheel speed multiplier (0.25-5, default: 1)
   --no-tree                  Hide the file tree
@@ -179,6 +184,11 @@ Display:
 Other:
   -h, --help                 Show this help
   --version                  Show the version
+  --no-save                  Do not write config or save reviews
+
+Config:
+  Settings are read from $XDG_CONFIG_HOME/ocdiff/config.json. Theme and layout
+  changes made in the viewer are written back to that file.
 
 Keys:
   j/k scroll  [/] hunks  n/p files  b tree  s single  v view

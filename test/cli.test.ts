@@ -3,14 +3,14 @@ import { parseArguments } from "../src/cli"
 
 test("parses Git display options", () => {
   expect(parseArguments(["--cwd", "/repo", "--base=main", "--source", "committed", "--view", "unified", "--single", "--no-tree"])).toEqual({
-    type: "run", cwd: "/repo", source: "committed", base: "main", theme: "opencode2", mode: "dark",
-    preferences: { view: "unified", tree: false, single: true },
+    type: "run", cwd: "/repo", source: "committed", base: "main", noSave: false,
+    overrides: { view: "unified", tree: false, single: true },
   })
 })
 
 test("selects a color theme and mode", () => {
   expect(parseArguments(["--theme", "tokyonight", "--mode", "light"])).toMatchObject({
-    type: "run", theme: "tokyonight", mode: "light",
+    type: "run", overrides: { theme: "tokyonight", mode: "light" },
   })
   expect(parseArguments(["--list-themes"])).toEqual({ type: "themes" })
   expect(() => parseArguments(["--theme", "missing"])).toThrow("Unknown theme")
@@ -19,9 +19,9 @@ test("selects a color theme and mode", () => {
 
 test("parses scroll speed options", () => {
   expect(parseArguments(["--scroll-lines", "3", "--scroll-wheel", "1.5"])).toMatchObject({
-    type: "run", preferences: { scrollLines: 3, scrollWheel: 1.5 },
+    type: "run", overrides: { scrollLines: 3, scrollWheel: 1.5 },
   })
-  expect(parseArguments([])).toMatchObject({ type: "run", preferences: { view: "auto", tree: true, single: false } })
+  expect(parseArguments([])).toMatchObject({ type: "run", overrides: {} })
   expect(() => parseArguments(["--scroll-lines", "0"])).toThrow("--scroll-lines")
   expect(() => parseArguments(["--scroll-lines", "2.5"])).toThrow("--scroll-lines")
   expect(() => parseArguments(["--scroll-wheel", "6"])).toThrow("--scroll-wheel")
@@ -36,11 +36,17 @@ test("accepts stdin and patch files", () => {
 test("opens and lists saved reviews", () => {
   expect(parseArguments(["--list-saved"])).toEqual({ type: "saved" })
   expect(parseArguments(["--open", "my review"])).toMatchObject({ type: "run", open: "my review" })
-  expect(parseArguments(["--open=my review", "--theme", "aura"])).toMatchObject({ type: "run", open: "my review", theme: "aura" })
+  expect(parseArguments(["--open=my review", "--theme", "aura"])).toMatchObject({
+    type: "run", open: "my review", overrides: { theme: "aura" },
+  })
   expect(() => parseArguments(["--open", "review", "--source", "working"])).toThrow("--open")
   expect(() => parseArguments(["--open", "review", "--base", "main"])).toThrow("--open")
   expect(() => parseArguments(["--open", "review", "--patch", "a.diff"])).toThrow("--open")
   expect(() => parseArguments(["--open", "review", "--list-saved"])).toThrow("--list-saved")
+})
+
+test("disables writes with --no-save", () => {
+  expect(parseArguments(["--no-save"])).toMatchObject({ type: "run", noSave: true })
 })
 
 test("rejects conflicting or unknown arguments", () => {

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import type { DiffFile } from "../src/model"
-import { createSnapshotStore } from "../src/store/snapshot"
+import { createSnapshotStore, readOnlySnapshotPort } from "../src/store/snapshot"
 
 const roots: string[] = []
 
@@ -134,4 +134,27 @@ test("validates names", async () => {
   const draft = { name: " ", cwd: "/repo", source: "branch", files: files(), reviewed: [] }
   await expect(snapshots.save(draft)).rejects.toThrow("needs a name")
   await expect(snapshots.save({ ...draft, name: "x".repeat(81) })).rejects.toThrow("at most 80")
+})
+
+test("keeps reads and blocks writes in read-only mode", async () => {
+  const { snapshots } = await store()
+  const saved = await snapshots.save({
+    name: "Review",
+    cwd: "/repo",
+    source: "branch",
+    files: files(),
+    reviewed: [],
+  })
+  const readOnly = readOnlySnapshotPort(snapshots)
+  expect(await readOnly.list()).toHaveLength(1)
+  expect((await readOnly.open(saved.id)).summary.name).toBe("Review")
+  await expect(readOnly.save({
+    name: "Second",
+    cwd: "/repo",
+    source: "branch",
+    files: files(),
+    reviewed: [],
+  })).rejects.toThrow("--no-save")
+  await expect(readOnly.updateProgress(saved.id, ["src/a.ts"])).rejects.toThrow("--no-save")
+  await expect(readOnly.remove(saved.id)).rejects.toThrow("--no-save")
 })

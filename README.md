@@ -25,6 +25,7 @@ was extracted from.
 - Large added-file virtualization
 - All 34 bundled OpenCode color themes with runtime `t` / `T` switching
 - Dark and light modes
+- Persistent theme, layout, and scroll settings
 
 ## Install from source
 
@@ -66,10 +67,15 @@ ocdiff --list-saved
 ocdiff --open "payments refactor"
 ```
 
-Display options include `--theme <name>` (default `opencode2`),
+Display options include `--theme <name>` (default from config or `opencode2`),
 `--mode dark|light`, `--view auto|split|unified`, `--no-tree`, and `--single`.
 Scroll speed is adjustable with `--scroll-lines <1-20>` for `j`/`k` and arrow
 keys and `--scroll-wheel <0.25-5>` for the mouse wheel.
+
+Theme, layout, and scroll settings are read from
+`$XDG_CONFIG_HOME/ocdiff/config.json`; interactive changes such as `t`, `b`,
+`s`, and `v` are written back. Command-line values only affect the current run.
+Use `--no-save` to disable all writes.
 
 ## Keys
 
@@ -94,9 +100,10 @@ keys and `--scroll-wheel <0.25-5>` for the mouse wheel.
 
 Reviewed state and source/base last only for the current process unless the
 review is saved with `Ctrl+S`; saved reviews keep the diff, timestamps, and
-progress under the state directory. Image previews show the working tree only;
-committed and deleted images are never substituted with working-tree content.
-OpenCode session-based “Last turn” diffs are outside this tool's scope.
+progress under the state directory. Theme, layout, and scroll settings persist in
+the config file. Image previews show the working tree only; committed and deleted
+images are never substituted with working-tree content. OpenCode session-based
+“Last turn” diffs are outside this tool's scope.
 
 ## npm packages
 
@@ -120,6 +127,7 @@ bun run build
 
 See [the architecture guide](docs/development/architecture.md),
 [saved reviews](docs/features/saved-reviews.md),
+[configuration](docs/features/configuration.md),
 [build and release notes](docs/development/release.md), and
 [upstream provenance](docs/development/upstream.md).
 

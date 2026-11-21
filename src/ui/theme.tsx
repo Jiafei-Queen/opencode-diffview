@@ -34,7 +34,7 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue>()
 
-export function ThemeProvider(props: ParentProps<{ mode: ThemeMode; theme?: string }>) {
+export function ThemeProvider(props: ParentProps<{ mode: ThemeMode; theme?: string; onChange?: (name: string) => void }>) {
   const renderer = useRenderer()
   const [name, setName] = createSignal(
     props.theme !== undefined && hasTheme(props.theme) ? props.theme : DEFAULT_THEME,
@@ -53,7 +53,11 @@ export function ThemeProvider(props: ParentProps<{ mode: ThemeMode; theme?: stri
       const label = themeLabel(resolved.name)
       return resolved.mode === props.mode ? label : `${label} (${resolved.mode})`
     },
-    cycleTheme: (step) => setName((current) => nextTheme(current, step)),
+    cycleTheme: (step) => {
+      const next = nextTheme(name(), step)
+      setName(next)
+      props.onChange?.(next)
+    },
   }
 
   return <ThemeContext.Provider value={value}>{props.children}</ThemeContext.Provider>
