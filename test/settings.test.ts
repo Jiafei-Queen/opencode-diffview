@@ -84,7 +84,10 @@ test("round-trips settings through disk", async () => {
 })
 
 test("resolves the config path from XDG and the app override", () => {
-  expect(settingsFile({ XDG_CONFIG_HOME: "/xdg" }, "/home/user")).toBe("/xdg/ocdiff/config.json")
-  expect(settingsFile({}, "/home/user")).toBe("/home/user/.config/ocdiff/config.json")
-  expect(settingsFile({ OCDIFF_CONFIG_HOME: "/custom" }, "/home/user")).toBe("/custom/config.json")
+  expect(settingsFile({ XDG_CONFIG_HOME: "/xdg" }, "/home/user"))
+    .toBe(path.join("/xdg", "ocdiff", "config.json"))
+  expect(settingsFile({}, "/home/user"))
+    .toBe(path.join("/home/user", ".config", "ocdiff", "config.json"))
+  expect(settingsFile({ OCDIFF_CONFIG_HOME: "/custom" }, "/home/user"))
+    .toBe(path.join("/custom", "config.json"))
 })
